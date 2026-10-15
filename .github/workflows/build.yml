@@ -1,0 +1,28 @@
+name: Windows build
+
+on:
+  push:
+    branches: [main, 'feature/**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Build and run regression checks
+        shell: pwsh
+        run: ./build.ps1 -Publish
+      - name: Upload portable Windows app
+        uses: actions/upload-artifact@v4
+        with:
+          name: AudioLatency-win-x64
+          path: artifacts/AudioLatency-win-x64/
+          if-no-files-found: error
