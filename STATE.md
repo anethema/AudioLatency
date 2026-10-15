@@ -43,16 +43,18 @@ Build a Windows GUI that measures speaker/headphone acoustic latency with a syst
 - GitHub plugin authenticates as `anethema` and confirms repository push access.
 - Native Git Credential Manager sign-in was available for repository setup; no new login was needed.
 - Local Git initialized with `origin` pointing to the public repository.
-- Main contains the repository baseline; implementation is on `feature/acoustic-latency-app`.
-- Draft implementation PR: `https://github.com/anethema/AudioLatency/pull/1` (left unmerged pending hardware testing).
+- PR #1 was merged: `https://github.com/anethema/AudioLatency/pull/1`. Main includes the app and v0.1.1 full-field device-selector fix.
+- Further changes use a fresh branch and separate pull request. The README download guide is on `feature/document-downloads`.
 - Native Git pushes and pull-request creation succeeded. The plugin's PR creation call returned an integration-permission error; native GitHub authentication provided the working path.
 - Windows CI passed build, regression checks, portable publish and artifact upload: `https://github.com/anethema/AudioLatency/actions/runs/38807708112`.
+- Portable builds are downloaded from successful Windows build workflow runs as `AudioLatency-win-x64` ZIP artifacts. GitHub sign-in is required. The source ZIP and repository tree do not include the generated local `artifacts/` folder.
+- README now gives repository-page-to-download steps, extraction/run instructions, optional PDB guidance, artifact troubleshooting, and a separate source-build section with the local output path. Directions were checked against the workflow and official GitHub artifact-download documentation; application code is unchanged.
 
 ## Next steps
 
 1. Extend the initial wired/Bluetooth smoke test with repeatable geometry and settings; measure real-world accuracy and rejection rate.
 2. Exercise disconnect, unavailable microphone and all-trials-rejected cases in the GUI. Cancel/restart has already passed two automated GUI smoke cycles.
-3. Review the measurements, then mark PR #1 ready and merge when accepted.
+3. Review and merge the separate README download-guide pull request when accepted.
 4. Consider continuous-playback warm-up to separate wake-up behavior from steady latency.
 5. Choose a project license before inviting reuse.
 6. Evaluate optional trial-specific coded probes and a peak-versus-background match criterion against speech, music, impulsive sounds and reverberation. The current signal is still a 30 ms chirp; no coded-signal mode or new latency decomposition has been added.
