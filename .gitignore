@@ -1,0 +1,13 @@
+**/bin/
+**/obj/
+.vs/
+.idea/
+.tools/
+artifacts/
+TestResults/
+*.user
+*.suo
+*.wav
+*.csv
+*.session.json
+audio-latency-*.json
