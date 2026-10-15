@@ -13,6 +13,7 @@ Build a Windows GUI that measures speaker/headphone acoustic latency with a syst
 - WASAPI shared-mode playback and capture on a dedicated thread, submission QPC and microphone packet timestamps.
 - Device selection, repeated trials, microphone meter during tests, measurement table/graph, wired-reference management and JSON/CSV exports.
 - Root build/run scripts, Windows CI and portable x64 publish configuration.
+- Version 0.1.1 fixes both device selectors so the entire field opens the dropdown. The full-width toggle preserves the existing selection and keyboard behavior.
 
 ## Measurement decisions
 
@@ -31,7 +32,10 @@ Build a Windows GUI that measures speaker/headphone acoustic latency with a syst
 - GUI launched and was visually inspected. Device enumeration found seven outputs and four inputs on the development PC.
 - Two real WASAPI start/cancel/release cycles and two GUI start/cancel/restart cycles passed before the first chirp. Cancel button re-enable and device selector contrast were fixed during review.
 - Synthetic tests cover noise, polarity, differing sample rates, clipping, ambiguous matches, search boundaries, statistics and per-trial queue removal in reference comparisons.
-- Physical acoustic timing, wired/Bluetooth comparisons and mid-run device-disconnect behavior remain unverified.
+- Owner-reported hardware smoke test: approximately 30 ms for a wired setup and 362 ms for a Bluetooth setup. This supports basic physical operation; the roughly 332 ms difference is additional output-path delay, not a calibrated Bluetooth-only measurement. Microphone/geometry equivalence and absolute accuracy have not been independently verified.
+- Version 0.1.1 Release build and all 10 regression checks passed. GUI checks verified the text side, center and arrow side of both selectors are full-field dropdown targets.
+- The updated portable build is at `artifacts/AudioLatency-win-x64-0.1.1/AudioLatency.exe`. The existing v0.1.0 process was left open to preserve any unsaved measurements or reference. `run.ps1` now chooses the most recently published portable build.
+- Mid-run device-disconnect behavior and calibrated absolute timing remain unverified.
 
 ## GitHub
 
@@ -46,11 +50,12 @@ Build a Windows GUI that measures speaker/headphone acoustic latency with a syst
 
 ## Next steps
 
-1. Test a known wired output and a Bluetooth output with the same microphone. Measure real-world accuracy and rejection rate.
+1. Extend the initial wired/Bluetooth smoke test with repeatable geometry and settings; measure real-world accuracy and rejection rate.
 2. Exercise disconnect, unavailable microphone and all-trials-rejected cases in the GUI. Cancel/restart has already passed two automated GUI smoke cycles.
 3. Review the measurements, then mark PR #1 ready and merge when accepted.
 4. Consider continuous-playback warm-up to separate wake-up behavior from steady latency.
 5. Choose a project license before inviting reuse.
+6. Evaluate optional trial-specific coded probes and a peak-versus-background match criterion against speech, music, impulsive sounds and reverberation. The current signal is still a 30 ms chirp; no coded-signal mode or new latency decomposition has been added.
 
 ## Known limits
 

@@ -27,6 +27,8 @@ Building requires the **.NET 8 SDK**, including Windows desktop build support. T
 
 The test records only while it is running. Recordings are held in memory and are not saved or uploaded. Exported JSON/CSV files contain measurements and device information, not microphone audio. Nothing plays or records automatically at launch.
 
+Both device selectors open when you click anywhere in the field, including the selected device name. `run.ps1` launches the most recently published local portable build, including builds in versioned sibling folders. Close an older instance after saving any reference you want to keep; an already running process continues using its original version.
+
 If all trials fail, check Windows microphone privacy settings, microphone levels and the selected output. Move the mic closer, reduce volume if clipping is reported, and disable microphone noise suppression, echo cancellation or other enhancements where possible. Those effects can suppress the chirp or add variable delay. Leave microphone settings unchanged between comparison runs.
 
 ## What the numbers mean
@@ -49,6 +51,7 @@ This comparison approximately cancels shared microphone/system delays. Different
 - Playback runs on a dedicated thread. A high-resolution performance-counter timestamp brackets submission of the first chirp frame. Interrupted submissions are rejected.
 - Microphone packets include WASAPI sample-position and performance-counter timestamps. Detection uses the timestamp of the matching packet plus its sample offset, rather than callback arrival time.
 - Normalized FFT cross-correlation detects the strongest matching sweep, including inverted polarity. Independent playback/input sample rates are supported.
+- Detection matches the sweep's waveform, rather than triggering on a volume threshold alone. Room sounds that do not resemble it generally produce weaker matches, but loud interference can mask it and strong reflections can shift the detected peak. The match score is not a guarantee that every accepted result is correct; the current noise tests use synthetic Gaussian noise, not a broad set of real room recordings.
 - Timestamp errors, gaps, output underruns, clipping, weak matches, and competing matches are rejected. Correlation is a match score, not a calibrated probability or accuracy guarantee.
 - Detection searches up to **1,500 ms** after submission. Trials are approximately two seconds apart. Very late echoes or delays longer than that window are unsupported.
 - Acoustic compensation assumes 343 m/s (`distance_cm / 34.3` milliseconds). Air temperature and placement introduce uncertainty.

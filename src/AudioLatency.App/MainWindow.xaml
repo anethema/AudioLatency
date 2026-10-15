@@ -76,20 +76,14 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="34" />
                                 </Grid.ColumnDefinitions>
-                                <ContentPresenter Grid.Column="0" Margin="10,0,3,0" VerticalAlignment="Center"
-                                                  HorizontalAlignment="Left" Content="{TemplateBinding SelectionBoxItem}"
-                                                  ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
-                                                  ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
-                                                  ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"
-                                                  TextElement.Foreground="{TemplateBinding Foreground}"
-                                                  IsHitTestVisible="False" />
-                                <ToggleButton Grid.Column="1" Focusable="False" IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+                                <!-- One full-field hit target opens the list from the device name or arrow. -->
+                                <ToggleButton Grid.ColumnSpan="2" Focusable="False" IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
                                               ClickMode="Press" Background="Transparent" BorderThickness="0">
                                     <ToggleButton.Template>
                                         <ControlTemplate TargetType="ToggleButton">
-                                            <Border x:Name="ArrowBorder" Background="Transparent" CornerRadius="0,7,7,0">
+                                            <Border x:Name="ArrowBorder" Background="Transparent" CornerRadius="7">
                                                 <TextBlock Text="⌄" Foreground="#AAB6C3" FontSize="15" FontWeight="SemiBold"
-                                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                           HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0" />
                                             </Border>
                                             <ControlTemplate.Triggers>
                                                 <Trigger Property="IsMouseOver" Value="True">
@@ -99,6 +93,13 @@
                                         </ControlTemplate>
                                     </ToggleButton.Template>
                                 </ToggleButton>
+                                <ContentPresenter Grid.Column="0" Margin="10,0,3,0" VerticalAlignment="Center"
+                                                  HorizontalAlignment="Left" Content="{TemplateBinding SelectionBoxItem}"
+                                                  ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                                  ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                                  ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"
+                                                  TextElement.Foreground="{TemplateBinding Foreground}"
+                                                  IsHitTestVisible="False" />
                             </Grid>
                             <Popup x:Name="PART_Popup" Placement="Bottom"
                                    PlacementTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"
