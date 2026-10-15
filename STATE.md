@@ -29,7 +29,7 @@ Build a Windows GUI that measures speaker/headphone acoustic latency with a syst
 - Release solution build passed with zero warnings/errors; regression harness passed 10/10 checks.
 - Portable self-contained x64 publish succeeded at `artifacts/AudioLatency-win-x64/AudioLatency.exe`.
 - GUI launched and was visually inspected. Device enumeration found seven outputs and four inputs on the development PC.
-- Two real WASAPI start/cancel/release cycles passed before the first chirp. Cancel button re-enable and device selector contrast were fixed during review.
+- Two real WASAPI start/cancel/release cycles and two GUI start/cancel/restart cycles passed before the first chirp. Cancel button re-enable and device selector contrast were fixed during review.
 - Synthetic tests cover noise, polarity, differing sample rates, clipping, ambiguous matches, search boundaries, statistics and per-trial queue removal in reference comparisons.
 - Physical acoustic timing, wired/Bluetooth comparisons and mid-run device-disconnect behavior remain unverified.
 
@@ -39,13 +39,16 @@ Build a Windows GUI that measures speaker/headphone acoustic latency with a syst
 - GitHub plugin authenticates as `anethema` and confirms repository push access.
 - Native Git Credential Manager sign-in was available for repository setup; no new login was needed.
 - Local Git initialized with `origin` pointing to the public repository.
-- First push and implementation pull request pending final checks.
+- Main contains the repository baseline; implementation is on `feature/acoustic-latency-app`.
+- Draft implementation PR: `https://github.com/anethema/AudioLatency/pull/1` (left unmerged pending hardware testing).
+- Native Git pushes and pull-request creation succeeded. The plugin's PR creation call returned an integration-permission error; native GitHub authentication provided the working path.
+- Windows CI passed build, regression checks, portable publish and artifact upload: `https://github.com/anethema/AudioLatency/actions/runs/38807708112`.
 
 ## Next steps
 
-1. Push a baseline/main branch and the implementation branch, then open the first pull request.
-2. Test a known wired output and a Bluetooth output with the same microphone. Measure real-world accuracy and rejection rate.
-3. Exercise cancel/restart, disconnect, unavailable microphone and all-trials-rejected cases in the GUI.
+1. Test a known wired output and a Bluetooth output with the same microphone. Measure real-world accuracy and rejection rate.
+2. Exercise disconnect, unavailable microphone and all-trials-rejected cases in the GUI. Cancel/restart has already passed two automated GUI smoke cycles.
+3. Review the measurements, then mark PR #1 ready and merge when accepted.
 4. Consider continuous-playback warm-up to separate wake-up behavior from steady latency.
 5. Choose a project license before inviting reuse.
 
