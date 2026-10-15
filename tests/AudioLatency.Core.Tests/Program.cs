@@ -1,4 +1,5 @@
 using AudioLatency.Core;
+using System.Text.Json;
 
 var tests = new (string Name, Action Run)[]
 {
@@ -12,6 +13,9 @@ var tests = new (string Name, Action Run)[]
     ("reference comparison removes per-trial queue delay", ReferenceRemovesPerTrialQueue),
     ("reference comparison rejects incompatible runs", ReferenceRejectsIncompatibleRuns),
     ("chirp generation validates format and returns the expected duration", ChirpGeneration),
+    ("queue-adjusted statistics pair trials and exclude rejected results", QueueAdjustedStatistics),
+    ("negative queue-adjusted estimates remain visible", NegativeQueueAdjustedEstimate),
+    ("legacy references retain raw values when loaded and exported", LegacyReferenceCompatibility),
 };
 
 int failures = 0;
@@ -200,11 +204,92 @@ static void ChirpGeneration()
     Check.Throws<ArgumentOutOfRangeException>(() => ChirpSignal.Create(48_000, 10_000, 24_000));
 }
 
+static void QueueAdjustedStatistics()
+{
+    var session = Session("speaker", "mic", 48_000,
+        new TrialResult(1, 40, 5, 0.9, 0.2, "Valid"),
+        new TrialResult(2, 50, 20, 0.9, 0.2, "Valid"),
+        new TrialResult(3, 100, 30, 0.9, 0.2, "Valid"),
+        new TrialResult(4, null, 100, 0.1, 0.1, "Rejected"));
+    Check.Equal(35.0, session.MedianQueueAdjustedMs!.Value, 1e-12,
+        "Pair each raw value with its queue before taking the median.");
+    Check.Equal(50.0, session.MedianMs!.Value, 1e-12, "The raw median must remain available.");
+    Check.Equal(20.0, session.MedianQueueMs!.Value, 1e-12, "The queue summary must exclude rejected trials.");
+    Check.Equal(3, session.AcceptedCount, "Adding derived metrics must not change trial acceptance.");
+    Check.True(session.Trials[3].QueueAdjustedLatencyMs is null,
+        "A missing raw detection must remain missing after queue adjustment.");
+
+    var varyingQueue = Session("speaker", "mic", 48_000,
+        new TrialResult(1, 60, 20, 0.9, 0.2, "Valid"),
+        new TrialResult(2, 80, 40, 0.9, 0.2, "Valid"),
+        new TrialResult(3, 100, 60, 0.9, 0.2, "Valid"));
+    Check.Equal(40.0, varyingQueue.MedianQueueAdjustedMs!.Value, 1e-12,
+        "The result should remove a varying queue from a constant downstream delay.");
+    Check.Equal(0.0, varyingQueue.QueueAdjustedJitterMs!.Value, 1e-12,
+        "Queue variation alone must not appear as adjusted jitter.");
+    Check.True(varyingQueue.JitterMs > 0, "Raw jitter must still reflect the variable total path.");
+
+    var rejected = Session("speaker", "mic", 48_000,
+        Enumerable.Range(1, 3).Select(i => new TrialResult(i, null, 20, 0, 0, "Not detected")).ToArray());
+    Check.True(rejected.MedianQueueAdjustedMs is null && rejected.QueueAdjustedJitterMs is null,
+        "An all-rejected run must have no adjusted result or jitter.");
+    Check.False(rejected.HasNegativeQueueAdjustedValues, "Rejected trials must not cause a negative-value warning.");
+}
+
+static void NegativeQueueAdjustedEstimate()
+{
+    var session = Session("speaker", "mic", 48_000,
+        new TrialResult(1, 10, 20, 0.9, 0.2, "Valid"),
+        new TrialResult(2, 15, 25, 0.9, 0.2, "Valid"),
+        new TrialResult(3, 20, 30, 0.9, 0.2, "Valid"));
+    Check.Equal(-10.0, session.MedianQueueAdjustedMs!.Value, 1e-12,
+        "Preserve a negative estimate instead of silently clamping it to zero.");
+    Check.True(session.HasNegativeQueueAdjustedValues, "Negative estimates must be flagged for the UI.");
+    Check.Equal(15.0, session.MedianMs!.Value, 1e-12, "The raw measurement must remain positive and unchanged.");
+}
+
+static void LegacyReferenceCompatibility()
+{
+    // This is the original raw-data format, without any queue-adjusted derived fields.
+    const string legacyJson = """
+        {
+          "CreatedAt": "2026-10-15T00:00:00+00:00",
+          "Output": { "Id": "wired", "Name": "Wired output", "IsDefault": false },
+          "Input": { "Id": "mic", "Name": "Microphone", "IsDefault": true },
+          "Options": { "OutputDeviceId": "wired", "InputDeviceId": "mic", "TrialCount": 3, "Volume": 0.2, "DistanceCm": 0 },
+          "OutputSampleRate": 48000, "InputSampleRate": 48000,
+          "OutputBufferMs": 40, "InputStreamLatencyMs": 10,
+          "Trials": [
+            { "Number": 1, "LatencyMs": 50, "QueueMs": 10, "Correlation": 0.9, "Peak": 0.2, "Status": "Valid" },
+            { "Number": 2, "LatencyMs": 60, "QueueMs": 20, "Correlation": 0.9, "Peak": 0.2, "Status": "Valid" },
+            { "Number": 3, "LatencyMs": 70, "QueueMs": 30, "Correlation": 0.9, "Peak": 0.2, "Status": "Valid" }
+          ]
+        }
+        """;
+    var legacy = JsonSerializer.Deserialize<MeasurementSession>(legacyJson)!;
+    legacy.Options.Validate();
+    Check.Equal(60.0, legacy.MedianMs!.Value, 1e-12, "Legacy latencies must keep their raw meaning.");
+    Check.Equal(40.0, legacy.MedianQueueAdjustedMs!.Value, 1e-12, "Legacy data must derive the adjusted result on load.");
+    var current = Session("bluetooth", "mic", 48_000, ValidTrials(3, 362, 20));
+    Check.Equal(302.0, ReferenceComparison.ExtraDelayMs(current, legacy)!.Value, 1e-12,
+        "The existing reference comparison must subtract the queue once, including legacy references.");
+
+    string json = JsonSerializer.Serialize(legacy);
+    using var document = JsonDocument.Parse(json);
+    Check.Equal(60.0, document.RootElement.GetProperty("Trials")[1].GetProperty("LatencyMs").GetDouble(), 1e-12,
+        "Exported raw fields must preserve their old meaning.");
+    Check.Equal(40.0, document.RootElement.GetProperty("Trials")[1].GetProperty("QueueAdjustedLatencyMs").GetDouble(), 1e-12,
+        "Exports must include separately named adjusted fields.");
+    var roundTrip = JsonSerializer.Deserialize<MeasurementSession>(json)!;
+    Check.Equal(legacy.MedianQueueAdjustedMs!.Value, roundTrip.MedianQueueAdjustedMs!.Value, 1e-12,
+        "Exporting and reloading a reference must not apply the adjustment twice.");
+}
+
 static MeasurementSession Session(string outputId, string inputId, int inputRate, params TrialResult[] trials) =>
     new(DateTimeOffset.UnixEpoch,
         new AudioDeviceInfo(outputId, outputId, false),
         new AudioDeviceInfo(inputId, inputId, false),
-        new MeasurementOptions(outputId, inputId),
+        new MeasurementOptions(outputId, inputId, TrialCount: trials.Length),
         OutputSampleRate: 48_000,
         InputSampleRate: inputRate,
         OutputBufferMs: 0,

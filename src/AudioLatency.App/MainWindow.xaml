@@ -381,7 +381,7 @@
                                     <TextBlock Text="02" Foreground="{StaticResource AccentBrush}" FontSize="11" FontWeight="Bold" Margin="0,2,9,0" />
                                     <TextBlock Text="Results" Style="{StaticResource SectionTitle}" />
                                 </StackPanel>
-                                <TextBlock x:Name="RunSummaryText" Text="Complete a test to see the measured latency and trial details."
+                                <TextBlock x:Name="RunSummaryText" Text="Complete a test to see the queue-adjusted estimate and trial details."
                                            Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="20,4,0,0" />
                             </StackPanel>
                             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
@@ -400,18 +400,20 @@
                                 <ColumnDefinition Width="12" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                            <Border Grid.Column="0" Background="{StaticResource PanelAltBrush}" BorderBrush="#303844" BorderThickness="1" CornerRadius="11" Padding="15,13">
+                            <Border Grid.Column="0" Background="#1B2929" BorderBrush="#3A6B60" BorderThickness="1" CornerRadius="11" Padding="15,13">
                                 <StackPanel>
-                                    <TextBlock Text="MEDIAN APP-TO-MIC" Foreground="{StaticResource MutedBrush}" FontSize="10" FontWeight="SemiBold" />
+                                    <TextBlock Text="MEDIAN QUEUE-ADJUSTED LATENCY" Foreground="{StaticResource AccentBrush}" FontSize="10" FontWeight="SemiBold" />
                                     <TextBlock x:Name="MedianResultText" Text="—" Style="{StaticResource MetricValue}" Margin="0,8,0,3" />
-                                    <TextBlock Text="submission to timestamped sample" Foreground="{StaticResource FaintBrush}" FontSize="10" />
+                                    <TextBlock Text="Estimate after removing this test's app queue" Foreground="{StaticResource FaintBrush}" FontSize="10" TextWrapping="Wrap" />
+                                    <TextBlock x:Name="RawMedianResultText" Text="Raw app-to-mic median: —" Foreground="{StaticResource MutedBrush}" FontSize="10" Margin="0,8,0,0" TextWrapping="Wrap" />
+                                    <TextBlock x:Name="QueueMedianResultText" Text="App queue median: —" Foreground="{StaticResource MutedBrush}" FontSize="10" Margin="0,3,0,0" TextWrapping="Wrap" />
                                 </StackPanel>
                             </Border>
                             <Border Grid.Column="2" Background="{StaticResource PanelAltBrush}" BorderBrush="#303844" BorderThickness="1" CornerRadius="11" Padding="15,13">
                                 <StackPanel>
-                                    <TextBlock Text="JITTER · STANDARD DEVIATION" Foreground="{StaticResource MutedBrush}" FontSize="10" FontWeight="SemiBold" />
+                                    <TextBlock Text="QUEUE-ADJUSTED JITTER · STANDARD DEVIATION" Foreground="{StaticResource MutedBrush}" FontSize="10" FontWeight="SemiBold" TextWrapping="Wrap" />
                                     <TextBlock x:Name="JitterResultText" Text="—" Style="{StaticResource MetricValue}" Margin="0,8,0,3" />
-                                    <TextBlock Text="across accepted trials" Foreground="{StaticResource FaintBrush}" FontSize="10" />
+                                    <TextBlock Text="across accepted queue-adjusted trials" Foreground="{StaticResource FaintBrush}" FontSize="10" TextWrapping="Wrap" />
                                 </StackPanel>
                             </Border>
                             <Border Grid.Column="4" Background="{StaticResource PanelAltBrush}" BorderBrush="#303844" BorderThickness="1" CornerRadius="11" Padding="15,13">
@@ -422,6 +424,12 @@
                                 </StackPanel>
                             </Border>
                         </Grid>
+
+                        <Border x:Name="NegativeQueueAdjustedWarning" Visibility="Collapsed" Background="#322A1E" BorderBrush="#806536" BorderThickness="1"
+                                CornerRadius="9" Padding="12,9" Margin="0,11,0,0">
+                            <TextBlock Text="A negative queue-adjusted trial was detected. This indicates queue or timestamp uncertainty; it does not mean physical delay is negative."
+                                       Foreground="{StaticResource WarningBrush}" FontSize="11" TextWrapping="Wrap" />
+                        </Border>
 
                         <Border Background="#131920" BorderBrush="#29343C" BorderThickness="1" CornerRadius="9" Padding="12,10" Margin="0,13,0,0">
                             <Grid>
@@ -440,7 +448,7 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock x:Name="ComparisonStatusText" Text="Extra delay compares accepted trial medians after removing each run’s measured app queue."
+                            <TextBlock x:Name="ComparisonStatusText" Text="Extra delay compares queue-adjusted medians from each run."
                                        Foreground="{StaticResource FaintBrush}" FontSize="10" VerticalAlignment="Center" TextWrapping="Wrap" />
                             <WrapPanel Grid.Column="1" HorizontalAlignment="Right">
                                 <Button x:Name="SetReferenceButton" Content="Set current as wired reference" Style="{StaticResource BaseButton}"
@@ -467,7 +475,7 @@
                                 <TextBlock Text="03" Foreground="{StaticResource AccentBrush}" FontSize="11" FontWeight="Bold" Margin="0,2,9,0" />
                                 <TextBlock Text="Trial consistency" Style="{StaticResource SectionTitle}" />
                             </StackPanel>
-                            <TextBlock Grid.Column="1" Text="Accepted samples shown in teal" Foreground="{StaticResource FaintBrush}" FontSize="10" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="Queue-adjusted latency by trial · accepted samples shown in teal" Foreground="{StaticResource FaintBrush}" FontSize="10" VerticalAlignment="Center" />
                         </Grid>
                         <Border Background="#12171D" BorderBrush="#29313B" BorderThickness="1" CornerRadius="10" Padding="8" Margin="0,0,0,14">
                             <Canvas x:Name="TrialChartCanvas" Height="150" SizeChanged="TrialChartCanvas_SizeChanged" />
@@ -479,10 +487,11 @@
                                   HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="#" Binding="{Binding Number}" Width="70" />
-                                <DataGridTextColumn Header="LATENCY" Binding="{Binding LatencyText}" Width="1.15*" />
+                                <DataGridTextColumn Header="ADJUSTED" Binding="{Binding QueueAdjustedLatencyText}" Width="1.25*" />
+                                <DataGridTextColumn Header="RAW APP-TO-MIC" Binding="{Binding LatencyText}" Width="1.45*" />
                                 <DataGridTextColumn Header="APP QUEUE" Binding="{Binding QueueMs, StringFormat={}{0:F1} ms}" Width="1.15*" />
                                 <DataGridTextColumn Header="CORRELATION" Binding="{Binding QualityText}" Width="1.15*" />
-                                <DataGridTextColumn Header="STATUS" Binding="{Binding Status}" Width="2*" />
+                                <DataGridTextColumn Header="STATUS" Binding="{Binding Status}" Width="1.8*" />
                             </DataGrid.Columns>
                         </DataGrid>
                     </StackPanel>
@@ -492,10 +501,10 @@
                     <StackPanel>
                         <TextBlock Text="Measurement notes" Style="{StaticResource SectionTitle}" FontSize="15" Margin="0,0,0,10" />
                         <TextBlock TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" LineHeight="20">
-                            <Run Text="The main metric measures from buffer submission to the corresponding timestamped microphone sample. It includes render queue, device and acoustic path, plus any uncompensated input delay; it is not callback delivery latency." />
+                            <Run Text="Raw app-to-mic latency measures from buffer submission to the corresponding timestamped microphone sample. It includes this endpoint's app queue, Windows and device behavior, the acoustic path, plus any uncompensated input delay; it is not callback delivery latency." />
                         </TextBlock>
                         <TextBlock TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" LineHeight="20" Margin="0,6,0,0">
-                            <Run Text="Distance compensation applies to the measurements. Extra output delay compares median accepted trials after removing measured app queue from each run; it is an estimate and not a pure Bluetooth codec latency." />
+                            <Run Text="Queue-adjusted latency subtracts only the estimated queue at this test's audio endpoint. It remains an estimate and still includes Windows, device and acoustic behavior, plus uncompensated input delay. Other apps may use different buffering, so their end-to-end delay can differ. Distance compensation applies to the measurements." />
                         </TextBlock>
                         <TextBlock Text="Start at a conservative volume. A built-in or USB microphone is recommended; Bluetooth headset microphones can add substantial input delay. Exported files contain measurement data only, never audio recordings."
                                    TextWrapping="Wrap" Foreground="{StaticResource WarningBrush}" FontSize="11" Margin="0,9,0,0" />

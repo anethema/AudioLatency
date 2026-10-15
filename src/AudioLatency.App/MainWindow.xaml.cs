@@ -247,10 +247,15 @@ public partial class MainWindow : Window
     private void UpdateResults()
     {
         var current = _currentSession;
-        MedianResultText.Text = FormatMs(current?.MedianMs);
-        JitterResultText.Text = FormatMs(current?.JitterMs);
+        MedianResultText.Text = FormatMs(current?.MedianQueueAdjustedMs);
+        RawMedianResultText.Text = $"Raw app-to-mic median: {FormatMs(current?.MedianMs)}";
+        QueueMedianResultText.Text = $"App queue median: {FormatMs(current?.MedianQueueMs)}";
+        JitterResultText.Text = FormatMs(current?.QueueAdjustedJitterMs);
+        NegativeQueueAdjustedWarning.Visibility = current?.HasNegativeQueueAdjustedValues == true
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         RunSummaryText.Text = current is null
-            ? "Complete a test to see the measured latency and trial details."
+            ? "Complete a test to see the queue-adjusted estimate and trial details."
             : $"{current.CreatedAt.ToLocalTime():g}  ·  {current.AcceptedCount}/{current.Trials.Count} accepted  ·  {current.Output.Name} → {current.Input.Name}";
 
         if (_referenceSession is null)
@@ -273,7 +278,7 @@ public partial class MainWindow : Window
         else
         {
             ExtraDelayText.Text = FormatSignedMs(ReferenceComparison.ExtraDelayMs(current, _referenceSession));
-            ComparisonStatusText.Text = "Difference between median accepted path times after removing measured app queue from each run. This remains an estimate.";
+            ComparisonStatusText.Text = "Difference between queue-adjusted median accepted times for the current run and wired reference. This remains an estimate.";
         }
 
         if (_referenceSession is null)
@@ -444,7 +449,7 @@ public partial class MainWindow : Window
     private static string BuildCsv(MeasurementSession session)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("created_at,output_name,output_id,input_name,input_id,trial_count,volume,distance_cm,output_sample_rate,input_sample_rate,output_buffer_ms,input_stream_latency_ms,trial,latency_ms,app_queue_ms,correlation,peak,status");
+        builder.AppendLine("created_at,output_name,output_id,input_name,input_id,trial_count,volume,distance_cm,output_sample_rate,input_sample_rate,output_buffer_ms,input_stream_latency_ms,trial,latency_ms,app_queue_ms,correlation,peak,status,queue_adjusted_latency_ms");
         foreach (var trial in session.Trials.OrderBy(t => t.Number))
         {
             var values = new string?[]
@@ -466,7 +471,8 @@ public partial class MainWindow : Window
                 trial.QueueMs.ToString("R", CultureInfo.InvariantCulture),
                 trial.Correlation.ToString("R", CultureInfo.InvariantCulture),
                 trial.Peak.ToString("R", CultureInfo.InvariantCulture),
-                trial.Status
+                trial.Status,
+                trial.QueueAdjustedLatencyMs?.ToString("R", CultureInfo.InvariantCulture)
             };
             builder.AppendLine(string.Join(',', values.Select(CsvField)));
         }
@@ -524,21 +530,21 @@ public partial class MainWindow : Window
 
         var left = 42.0;
         var right = 12.0;
-        var top = 10.0;
+        var top = 20.0;
         var bottom = 25.0;
         var plotWidth = Math.Max(width - left - right, 10);
         var plotHeight = Math.Max(height - top - bottom, 10);
-        var accepted = _trialRows.Where(t => t.Accepted).OrderBy(t => t.Number).ToList();
+        var accepted = _trialRows.Where(t => t.QueueAdjustedLatencyMs.HasValue).OrderBy(t => t.Number).ToList();
 
         if (accepted.Count == 0)
         {
-            AddChartText(canvas, "Accepted trial latencies will appear here", width / 2 - 112, height / 2 - 8, "#8793A2", 11);
-            AddChartText(canvas, "ms", 7, top - 3, "#7F8B99", 10);
+            AddChartText(canvas, "Accepted queue-adjusted trial values will appear here", width / 2 - 145, height / 2 - 8, "#8793A2", 11);
+            AddChartText(canvas, "ms", 7, 0, "#7F8B99", 10);
             return;
         }
 
-        var minimum = accepted.Min(t => t.LatencyMs!.Value);
-        var maximum = accepted.Max(t => t.LatencyMs!.Value);
+        var minimum = accepted.Min(t => t.QueueAdjustedLatencyMs!.Value);
+        var maximum = accepted.Max(t => t.QueueAdjustedLatencyMs!.Value);
         if (Math.Abs(maximum - minimum) < 0.01)
         {
             minimum -= 1;
@@ -552,7 +558,7 @@ public partial class MainWindow : Window
         }
 
         var maxTrial = Math.Max(_trialRows.Count == 0 ? 1 : _trialRows.Max(t => t.Number), 2);
-        AddChartText(canvas, "ms", 7, top - 3, "#7F8B99", 10);
+        AddChartText(canvas, "ms", 7, 0, "#7F8B99", 10);
         for (var lineIndex = 0; lineIndex <= 2; lineIndex++)
         {
             var ratio = lineIndex / 2.0;
@@ -564,7 +570,7 @@ public partial class MainWindow : Window
 
         var points = accepted.Select(trial => new Point(
             left + (trial.Number - 1.0) / (maxTrial - 1.0) * plotWidth,
-            top + (maximum - trial.LatencyMs!.Value) / (maximum - minimum) * plotHeight)).ToList();
+            top + (maximum - trial.QueueAdjustedLatencyMs!.Value) / (maximum - minimum) * plotHeight)).ToList();
         for (var index = 1; index < points.Count; index++)
             AddChartLine(canvas, points[index - 1].X, points[index - 1].Y, points[index].X, points[index].Y, "#65D6C0", 2);
 
@@ -578,7 +584,7 @@ public partial class MainWindow : Window
                 Fill = new SolidColorBrush(Color.FromRgb(101, 214, 192)),
                 Stroke = new SolidColorBrush(Color.FromRgb(15, 33, 31)),
                 StrokeThickness = 2,
-                ToolTip = $"Trial {accepted[index].Number}: {accepted[index].LatencyMs!.Value:F1} ms"
+                ToolTip = $"Trial {accepted[index].Number} · Queue-adjusted: {accepted[index].QueueAdjustedLatencyText} · Raw app-to-mic: {accepted[index].LatencyText}"
             };
             Canvas.SetLeft(marker, point.X - marker.Width / 2);
             Canvas.SetTop(marker, point.Y - marker.Height / 2);

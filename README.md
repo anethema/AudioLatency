@@ -2,7 +2,7 @@
 
 A Windows desktop utility for measuring the audible delay of Bluetooth speakers, headphones, and other playback devices using a built-in or USB microphone.
 
-The app sends a short chirp, finds it in the microphone recording, and reports the time between submitting its audio buffer and the microphone's timestamped sample. Repeated trials show the median, variation, and detection quality. A wired-reference comparison estimates the additional delay of another output path.
+The app sends a short chirp, finds it in the microphone recording, and measures the time between submitting its audio buffer and the microphone's timestamped sample. The main result estimates the remaining latency after removing this test's measured output queue; the original app-to-microphone time and queue remain visible. Repeated trials show the median, variation, and detection quality. A wired-reference comparison estimates the additional delay of another output path.
 
 ## Download and run the portable app
 
@@ -29,7 +29,7 @@ If you cannot find the download, make sure you are signed in, opened a completed
 2. Select that playback device and a **built-in or USB microphone** in the app. Avoid using the Bluetooth headset's own microphone: that may change the headset's audio mode and adds a second wireless path.
 3. Place the microphone close to the speaker or headphone earcup. Keep its position fixed across trials. Start with a conservative volume.
 4. Choose the number of trials, and optionally enter the speaker-to-microphone distance in centimeters. A distance of zero leaves acoustic travel time in the result.
-5. Start the test. The microphone meter operates during recording. Wait for recording and analysis to finish; inspect the individual trials as well as the median.
+5. Start the test. The microphone meter operates during recording. Wait for recording and analysis to finish; inspect the queue-adjusted median, the raw app-to-mic time and app queue beneath it, and the individual trials.
 
 The test records only while it is running. Recordings are held in memory and are not saved or uploaded. Exported JSON/CSV files contain measurements and device information, not microphone audio. Nothing plays or records automatically at launch.
 
@@ -39,17 +39,23 @@ If all trials fail, check Windows microphone privacy settings, microphone levels
 
 ## What the numbers mean
 
-**App-to-microphone latency:** the elapsed time from submission of the first chirp frame to WASAPI to the detected microphone sample, optionally minus acoustic travel time. It includes the app's queued output, remaining Windows rendering, output hardware/Bluetooth processing, and input delays not compensated by the microphone driver. It excludes the time spent delivering the microphone packet to application code. This is a useful end-to-end acoustic-path estimate, not an independently calibrated laboratory measurement.
+**Queue-adjusted latency (the large result):** the median of `(app-to-mic latency − app queue)` calculated separately for each accepted trial. For example, a 60 ms app-to-mic measurement with a 20 ms queue gives an approximately 40 ms adjusted estimate. Removing the measured queue makes it easier to compare the remaining audio path without including this test's own queued output. It still includes downstream Windows buffering, output hardware/Bluetooth processing, acoustic travel unless compensated, and input delays not compensated by the microphone driver. It is not a calibrated device-only measurement.
+
+**Raw app-to-mic latency:** the original elapsed time from submission of the first chirp frame to WASAPI to the detected microphone sample, optionally minus acoustic travel time. This includes the app queue and is shown below the large result and in the trial table. Packet-delivery scheduling is excluded. The raw and adjusted values both retain the configured acoustic distance correction.
 
 **App queue:** the output padding observed when the chirp buffer is prepared, converted to milliseconds. This is an estimate of the audio already queued in this application's endpoint buffer. It is not all Windows buffering and is not the Bluetooth latency. The app requests a 40 ms shared-mode output buffer; the actual size depends on the endpoint and is included in the session export.
 
-**Jitter:** population standard deviation of accepted trial delays. The main result is the median. Rejected trials are excluded from both statistics; inspect the accepted count before relying on a run.
+Other sound applications also buffer audio, but their queues depend on their audio API, buffer settings, scheduling and device. A 20 ms queue in this test is not a fixed overhead shared by all apps. The adjusted estimate does not predict the exact latency of a game, music player or recording application.
+
+**Jitter:** the displayed population standard deviation of accepted **queue-adjusted** trial delays, matching the main result and graph. Rejected trials are excluded from these statistics; inspect the accepted count before relying on a run. Each trial is adjusted before aggregation; subtracting the two separately calculated medians can give a different result. A negative adjusted value is retained and flagged as queue/timestamp uncertainty rather than being silently rounded up to zero; it does not represent negative physical latency.
 
 **Estimated extra output delay:** the median of `(app-to-mic latency − app queue)` for the current run, minus that same median for a wired reference. At least three accepted trials in each run, the same microphone and microphone sample rate, and different output devices are required. Negative values mean the current path measured faster than the reference.
 
 To create a reference, measure a wired speaker/headphone output, save that run as the reference, then test the Bluetooth output. You can save/load the reference as a local JSON file. Keep microphone processing, levels, geometry, and other settings as similar as possible; distance compensation can account for changed acoustic spacing. The app cannot verify that a selected reference is physically wired.
 
 This comparison approximately cancels shared microphone/system delays. Different output drivers and hardware also have different delays, so the difference **does not isolate the Bluetooth radio, codec, or Windows stack individually**. A single microphone cannot identify those components separately. Advertised driver latency is shown in session metadata and is deliberately not subtracted as if it were a measured calibration.
+
+Saved references from earlier versions remain compatible. JSON fields `LatencyMs`, `MedianMs` and `JitterMs` keep their original raw meanings; `QueueAdjustedLatencyMs`, `MedianQueueAdjustedMs` and `QueueAdjustedJitterMs` provide the adjusted values separately. CSV retains its existing columns and adds `queue_adjusted_latency_ms` at the end. Loading an older reference derives the adjusted values from its stored raw time and queue, without subtracting the queue twice.
 
 ## Measurement method and limits
 
@@ -96,6 +102,7 @@ The regression harness has no external test-framework dependency and exits nonze
 ## Audio API references
 
 - [WASAPI capture sample positions and timestamps](https://learn.microsoft.com/en-us/windows/win32/api/audioclient/nf-audioclient-iaudiocaptureclient-getbuffer)
+- [WASAPI queued frames and endpoint padding](https://learn.microsoft.com/en-us/windows/win32/api/audioclient/nf-audioclient-iaudioclient-getcurrentpadding)
 - [Windows render and capture latency terminology](https://learn.microsoft.com/en-us/windows-hardware/drivers/audio/low-latency-audio)
 - [NAudio](https://github.com/naudio/NAudio) (MIT-licensed; this project currently uses NAudio.Wasapi 2.2.1)
 
