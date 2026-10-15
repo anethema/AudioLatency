@@ -4,18 +4,24 @@ A Windows desktop utility for measuring the audible delay of Bluetooth speakers,
 
 The app sends a short chirp, finds it in the microphone recording, and reports the time between submitting its audio buffer and the microphone's timestamped sample. Repeated trials show the median, variation, and detection quality. A wired-reference comparison estimates the additional delay of another output path.
 
-## Run
+## Download and run the portable app
 
-On Windows 10 or 11, run `AudioLatency.exe` from the portable `AudioLatency-win-x64` build. The portable build includes its .NET runtime and requires no Python installation.
+The portable app runs on **Windows 10 or 11 (x64)**. It includes its .NET runtime, so you do not need to install .NET, Python, or development tools to use it. No installer is required.
 
-From this checkout:
+**Download it from GitHub Actions:**
 
-```powershell
-.\build.ps1 -Publish
-.\run.ps1
-```
+1. **Sign in to GitHub.** GitHub requires you to be signed in to download Actions artifacts, even for a public repository.
+2. Open [anethema/AudioLatency](https://github.com/anethema/AudioLatency) and click the **Actions** tab near the top of the page.
+3. In the left sidebar, click **Windows build**. You can also [open the Windows build workflow directly](https://github.com/anethema/AudioLatency/actions/workflows/build.yml).
+4. Open the most recent **successful run for the `main` branch**, marked with a green check. The run's title may be a commit message; the branch name is shown alongside it. Builds from other branches may contain changes that have not been merged yet.
+5. On the run's **Summary** page, scroll down to **Artifacts** and click **AudioLatency-win-x64** to download the ZIP file.
+6. In Windows File Explorer, right-click the downloaded ZIP and choose **Extract All…**. Open the extracted folder and double-click **AudioLatency.exe**.
 
-Building requires the **.NET 8 SDK**, including Windows desktop build support. The scripts also recognize an optional SDK at `.tools/dotnet/`; that directory is local-only and excluded from source control. An installed runtime alone cannot build the app.
+The ZIP may also contain `.pdb` files. These are debugging symbols and are optional for portable use; you can copy just `AudioLatency.exe` to another folder or Windows x64 PC.
+
+**The repository's Code → Download ZIP button downloads source code, not the portable app.** The executable is supplied separately as the Actions artifact above. There is no compiled `artifacts/` folder in the repository: that folder is generated locally when building from source and is excluded from Git.
+
+If you cannot find the download, make sure you are signed in, opened a completed successful **Windows build** run, and are viewing its **Summary** rather than an individual job's logs. Older artifacts can expire; use a recent successful run. See [GitHub's artifact download instructions](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/download-workflow-artifacts) for additional help.
 
 ## Measure a device
 
@@ -27,7 +33,7 @@ Building requires the **.NET 8 SDK**, including Windows desktop build support. T
 
 The test records only while it is running. Recordings are held in memory and are not saved or uploaded. Exported JSON/CSV files contain measurements and device information, not microphone audio. Nothing plays or records automatically at launch.
 
-Both device selectors open when you click anywhere in the field, including the selected device name. `run.ps1` launches the most recently published local portable build, including builds in versioned sibling folders. Close an older instance after saving any reference you want to keep; an already running process continues using its original version.
+Both device selectors open when you click anywhere in the field, including the selected device name. When updating the app, save any reference you want to keep before closing an older instance; an already running process continues using its original version.
 
 If all trials fail, check Windows microphone privacy settings, microphone levels and the selected output. Move the mic closer, reduce volume if clipping is reported, and disable microphone noise suppression, echo cancellation or other enhancements where possible. Those effects can suppress the chirp or add variable delay. Leave microphone settings unchanged between comparison runs.
 
@@ -59,6 +65,19 @@ This comparison approximately cancels shared microphone/system delays. Different
 - Intermittent chirps can include Bluetooth/device wake-up behavior. This version does not separately measure continuous-playback and cold-start latency.
 
 ## Development
+
+### Build the portable app from source
+
+Clone the repository or download and extract its source ZIP, then open PowerShell in the project folder. Building requires the **.NET 8 SDK**, including Windows desktop build support. An installed runtime alone cannot build the app. The scripts also recognize an optional local SDK at `.tools/dotnet/`; that directory is excluded from Git.
+
+```powershell
+.\build.ps1 -Publish
+.\run.ps1
+```
+
+The build script compiles the app, runs the regression checks, and publishes the portable executable to **`artifacts/AudioLatency-win-x64/AudioLatency.exe` on your own computer**. The `artifacts/` folder is created by the build; it is not a folder to look for in GitHub's repository file list. `run.ps1` launches the most recently published local portable build, including builds in versioned sibling folders.
+
+### Build and test during development
 
 ```powershell
 dotnet build AudioLatency.sln -c Release
