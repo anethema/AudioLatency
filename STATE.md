@@ -14,10 +14,13 @@ Build a Windows GUI that measures speaker/headphone acoustic latency with a syst
 - Device selection, repeated trials, microphone meter during tests, measurement table/graph, wired-reference management and JSON/CSV exports.
 - Root build/run scripts, Windows CI and portable x64 publish configuration.
 - Version 0.1.1 fixes both device selectors so the entire field opens the dropdown. The full-width toggle preserves the existing selection and keyboard behavior.
+- Version 0.1.2 makes the large result a queue-adjusted estimate, with the raw app-to-mic median and queue shown beneath it. The graph, table and displayed jitter use adjusted values; raw measurements remain available and retain their saved/exported meanings.
 
 ## Measurement decisions
 
-- Main metric: buffer submission to microphone sample, with optional distance correction. Capture packet-delivery scheduling is excluded.
+- Raw metric: buffer submission to microphone sample, with optional distance correction. Capture packet-delivery scheduling is excluded.
+- Primary metric: median of each accepted trial's raw measurement minus its own observed queue. Displayed jitter is also calculated from those adjusted trials. Raw and adjusted values are separately named in exports, and older references remain compatible.
+- Negative adjusted estimates are retained and flagged as queue/timestamp uncertainty. This does not indicate negative physical latency.
 - App queue is observed from output padding. Wired comparison subtracts that estimate per trial before comparing medians.
 - Driver-reported input latency is metadata, not a reliable independent calibration; do not subtract it again.
 - Reject missing samples, unreliable timestamps, output underruns, clipping and ambiguous/weak detections.
@@ -34,8 +37,11 @@ Build a Windows GUI that measures speaker/headphone acoustic latency with a syst
 - Synthetic tests cover noise, polarity, differing sample rates, clipping, ambiguous matches, search boundaries, statistics and per-trial queue removal in reference comparisons.
 - Owner-reported hardware smoke test: approximately 30 ms for a wired setup and 362 ms for a Bluetooth setup. This supports basic physical operation; the roughly 332 ms difference is additional output-path delay, not a calibrated Bluetooth-only measurement. Microphone/geometry equivalence and absolute accuracy have not been independently verified.
 - Version 0.1.1 Release build and all 10 regression checks passed. GUI checks verified the text side, center and arrow side of both selectors are full-field dropdown targets.
-- The updated portable build is at `artifacts/AudioLatency-win-x64-0.1.1/AudioLatency.exe`. The existing v0.1.0 process was left open to preserve any unsaved measurements or reference. `run.ps1` now chooses the most recently published portable build.
+- The prior v0.1.1 portable build remains at `artifacts/AudioLatency-win-x64-0.1.1/AudioLatency.exe`. `run.ps1` chooses the most recently published portable build.
 - Mid-run device-disconnect behavior and calibrated absolute timing remain unverified.
+- Version 0.1.2 Release build passed with zero warnings/errors, and 13/13 regression checks passed: per-trial pairing, rejection exclusion, queue variation versus adjusted jitter, negative estimates and old-reference JSON round trips are covered.
+- GUI smoke checks verified adjusted median/jitter, raw/queue breakdown, a wired comparison, CSV column compatibility, negative-value warning and idle reset. Results/graph layout was visually inspected at the minimum window width using synthetic data; these were not new acoustic measurements.
+- Version 0.1.2 self-contained publish succeeded at `artifacts/AudioLatency-win-x64-0.1.2/AudioLatency.exe`.
 
 ## GitHub
 
@@ -44,7 +50,8 @@ Build a Windows GUI that measures speaker/headphone acoustic latency with a syst
 - Native Git Credential Manager sign-in was available for repository setup; no new login was needed.
 - Local Git initialized with `origin` pointing to the public repository.
 - PR #1 was merged: `https://github.com/anethema/AudioLatency/pull/1`. Main includes the app and v0.1.1 full-field device-selector fix.
-- Further changes use a fresh branch and separate pull request. The README download guide is on `feature/document-downloads`.
+- PR #2 (README download guide) was also merged. Main includes both previous pull requests.
+- Further changes use a fresh branch and separate pull request. Queue-adjusted results are on `feature/queue-adjusted-results`.
 - Native Git pushes and pull-request creation succeeded. The plugin's PR creation call returned an integration-permission error; native GitHub authentication provided the working path.
 - Windows CI passed build, regression checks, portable publish and artifact upload: `https://github.com/anethema/AudioLatency/actions/runs/38807708112`.
 - Portable builds are downloaded from successful Windows build workflow runs as `AudioLatency-win-x64` ZIP artifacts. GitHub sign-in is required. The source ZIP and repository tree do not include the generated local `artifacts/` folder.
@@ -54,10 +61,10 @@ Build a Windows GUI that measures speaker/headphone acoustic latency with a syst
 
 1. Extend the initial wired/Bluetooth smoke test with repeatable geometry and settings; measure real-world accuracy and rejection rate.
 2. Exercise disconnect, unavailable microphone and all-trials-rejected cases in the GUI. Cancel/restart has already passed two automated GUI smoke cycles.
-3. Review and merge the separate README download-guide pull request when accepted.
+3. Review the separate queue-adjusted-results pull request and compare a real run's raw and adjusted values before merging.
 4. Consider continuous-playback warm-up to separate wake-up behavior from steady latency.
 5. Choose a project license before inviting reuse.
-6. Evaluate optional trial-specific coded probes and a peak-versus-background match criterion against speech, music, impulsive sounds and reverberation. The current signal is still a 30 ms chirp; no coded-signal mode or new latency decomposition has been added.
+6. Evaluate optional trial-specific coded probes and a peak-versus-background match criterion against speech, music, impulsive sounds and reverberation. The current signal is still a 30 ms chirp; no coded-signal mode or independent Windows/Bluetooth decomposition has been added.
 
 ## Known limits
 

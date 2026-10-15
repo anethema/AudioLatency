@@ -26,6 +26,10 @@ public sealed record TrialResult(int Number, double? LatencyMs, double QueueMs,
 {
     public bool Accepted => LatencyMs.HasValue;
     public string LatencyText => LatencyMs is double value ? $"{value:F1} ms" : "—";
+    // Keep the measured value intact for saved references and exports. Negative adjusted values
+    // remain visible as a sign of queue/timestamp uncertainty instead of being clamped to zero.
+    public double? QueueAdjustedLatencyMs => LatencyMs - QueueMs;
+    public string QueueAdjustedLatencyText => QueueAdjustedLatencyMs is double value ? $"{value:F1} ms" : "—";
     public string QualityText => $"{Correlation:P0}";
 }
 
@@ -39,6 +43,11 @@ public sealed record MeasurementSession(DateTimeOffset CreatedAt, AudioDeviceInf
     public double? MedianMs => Statistics.Median(Trials.Where(t => t.Accepted).Select(t => t.LatencyMs!.Value));
     public double? JitterMs => Statistics.StandardDeviation(Trials.Where(t => t.Accepted).Select(t => t.LatencyMs!.Value));
     public double? MedianQueueMs => Statistics.Median(Trials.Where(t => t.Accepted).Select(t => t.QueueMs));
+    // Adjust each accepted pair before aggregation: median(raw) - median(queue) is generally
+    // different from median(raw - queue), and queue variability should not inflate adjusted jitter.
+    public double? MedianQueueAdjustedMs => Statistics.Median(Trials.Where(t => t.Accepted).Select(t => t.QueueAdjustedLatencyMs!.Value));
+    public double? QueueAdjustedJitterMs => Statistics.StandardDeviation(Trials.Where(t => t.Accepted).Select(t => t.QueueAdjustedLatencyMs!.Value));
+    public bool HasNegativeQueueAdjustedValues => Trials.Any(t => t.QueueAdjustedLatencyMs < 0);
     public int AcceptedCount => Trials.Count(t => t.Accepted);
 }
 
@@ -62,8 +71,6 @@ public static class ReferenceComparison
         if (Incompatibility(current, reference) != null) return null;
         // Remove only the measured application queue from each path, rather than subtracting
         // the driver's advertised latency (which may already be represented in timestamps).
-        double? Path(MeasurementSession session) => Statistics.Median(session.Trials
-            .Where(t => t.Accepted).Select(t => t.LatencyMs!.Value - t.QueueMs));
-        return Path(current) - Path(reference);
+        return current.MedianQueueAdjustedMs - reference.MedianQueueAdjustedMs;
     }
 }
